@@ -1,89 +1,12 @@
 
-name: Build KOTO ISLAND APK
-
-on:
-  workflow_dispatch:
-  push:
-    paths:
-      - "*.zip"
-      - ".github/workflows/build.yml"
-
-permissions:
-  contents: read
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Extract Android project
+      - name: Enable AndroidX
         shell: bash
         run: |
-          mkdir -p extracted
-
-          ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)"
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: ZIP not found"
-            exit 1
-          fi
-
-          unzip -q "$ZIP_FILE" -d extracted
-
-          SETTINGS_FILE="$(find extracted -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
-
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: settings.gradle not found"
-            exit 1
-          fi
-
-          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Project directory: $PROJECT_DIR"
-          ls -la "$PROJECT_DIR"
-
-      - name: Detect Gradle version
-        id: gradle_version
-        shell: bash
-        run: |
-          PROPS="$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
-
-          if [ -f "$PROPS" ]; then
-            URL=$(grep '^distributionUrl=' "$PROPS" | cut -d= -f2- | sed 's/\\:/:/g')
-            VERSION=$(echo "$URL" | grep -oE 'gradle-[0-9]+(\.[0-9]+)+' | head -1 | sed 's/gradle-//')
-          fi
-
-          VERSION="${VERSION:-8.9}"
-
-          echo "Using Gradle $VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Install Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: ${{ steps.gradle_version.outputs.version }}
+          printf '\nandroid.useAndroidX=true\nandroid.enableJetifier=true\n' >> "$PROJECT_DIR/gradle.properties"
 
       - name: Build APK
         shell: bash
         run: |
           cd "$PROJECT_DIR"
           gradle --no-daemon assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: KOTO-ISLAND-APK
-          path: extracted/**/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
           
